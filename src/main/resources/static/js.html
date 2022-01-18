@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Insert title here</title>
+	<script src="/key.js"></script>
+	<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1058.0.min.js"></script>
+</head>
+<body>
+	<input type="file" name="file">
+	<button type="button" id="btn">저장</button>
+	<ul id="file_list">
+		
+	</ul>
+	<script type="text/javascript">
+		var albumBucketName = s3Key.albumBucketName;
+		var bucketRegion = s3Key.bucketRegion;
+		var IdentityPoolId = s3Key.IdentityPoolId;
+	
+		AWS.config.update({
+		  region: bucketRegion,
+		  credentials: new AWS.CognitoIdentityCredentials({
+		    IdentityPoolId: IdentityPoolId
+		  })
+		});
+	
+		var s3 = new AWS.S3({
+		  apiVersion: "2006-03-01",
+		  params: { Bucket: albumBucketName }
+		});
+		
+	
+		function uploadToS3(){
+			var file = document.querySelector("input[name=file]");
+			var files = file.files[0];
+			var fileOriginName = files.name;
+			
+			var now = new Date();
+			
+			var fileKey = now.getFullYear()
+						  +
+						  (now.getMonth() + 1).toString().padStart(2, '0')
+						  +
+						  (now.getDate()).toString().padStart(2, '0')
+						  + '_' +
+						  (now.getHours()).toString().padStart(2, '0')
+						  +
+						  (now.getMinutes()).toString().padStart(2, '0')
+						  +
+						  (now.getMilliseconds()).toString().padStart(3, '0')
+						  + '_' +
+						  fileOriginName;
+			
+			var upload = new AWS.S3.ManagedUpload({
+			    params: {
+			      Bucket: albumBucketName,
+			      Key: fileKey,
+			      Body: files
+			    }
+			  });
+			
+			upload.promise().then(function(data) {
+			      console.log(data);
+			      saveFile(files, fileKey, data.Location);
+		    }).catch(function(err) {
+			      return alert("There was an error uploading your photo: ", err.message);
+		    });
+
+		}
+	
+	
+	
+	
+		var btn = document.querySelector("#btn");
+		btn.onclick = uploadToS3
+			
+		function saveFile(file, savedName, fileUrl){
+			var fileData = {
+					originalName : file.name,
+					savedName : savedName,
+					fileUrl : fileUrl,
+					size : file.size
+			}
+			
+			fetch('http://localhost:8080/js', {
+				method: 'POST',
+				headers: {
+		            'Content-Type': 'application/json',
+		            'Data-Type': 'application/json',
+		        },
+				body: JSON.stringify(fileData)
+			}).then( async res => {
+				window.location.reload();
+			}).catch( async res => {
+				console.log( await res.text());
+			})
+		}
+		
+		
+		
+		window.onload = function(){
+			fetch('http://localhost:8080/file', {
+				method: 'GET'
+			}).then( async res => {
+				var fileList = await res.json();
+				var ul = document.querySelector('#file_list');
+				
+				var fileListHtmlList = fileList.map( f => {
+					var html = `<li data-id="${f.id}">
+									<div>
+										<span>${f.originalName}</span>
+										<span style="cursor:pointer;color:red;" onclick="deleteFile(event)">삭제</span>
+									</div>
+									<div>
+										<input type="file" name="edit">
+										<button type="button" onclick="editFile(event)">수정</button>
+									</div>
+									<image src="${f.fileUrl}"
+										   style="width:100px;">
+									</image>
+								</li>`;
+					return html;
+				})
+				
+				ul.innerHTML = fileListHtmlList.join('');
+			}).catch( async res => {
+				console.log( await res.text());
+			})
+		}
+		
+		
+		function deleteFile(e){
+			var li = e.target.closest('li');
+			var fileId = li.dataset['id'];
+			
+			fetch('http://localhost:8080/file?fileId=' + fileId, {
+				method: 'DELETE',
+			}).then( async res => {
+				window.location.reload();
+			}).catch( async res => {
+				console.log( await res.text());
+			})
+		}
+		
+		
+		function editFile(e){
+			var li = e.target.closest('li');
+			var fileId = li.dataset['id'];
+			
+			var file = e.target.parentElement.querySelector("input[name=edit]");
+			var files = file.files[0];
+			var formData = new FormData();
+			formData.set('file', files);
+			formData.set('fileId', fileId);
+			
+			fetch('http://localhost:8080/file', {
+				method: 'PUT',
+				body: formData
+			}).then( async res => {
+				console.log( await res.text());
+			}).catch( async res => {
+				console.log( await res.text());
+			})
+		}
+	</script>	
+</body>
+</html>

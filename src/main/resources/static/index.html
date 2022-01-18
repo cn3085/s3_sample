@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+</head>
+<body>
+	<input type="file" name="file">
+	<button type="button" id="btn">저장</button>
+	<ul id="file_list">
+		
+	</ul>
+	<script type="text/javascript">
+		var btn = document.querySelector("#btn");
+		btn.onclick = function(){
+			var file = document.querySelector("input[name=file]");
+			var files = file.files[0];
+			var formData = new FormData();
+			formData.set('file', files);
+			
+			fetch('http://localhost:8080/file', {
+				method: 'POST',
+				/* headers: {}, */
+				body: formData
+			}).then( async res => {
+				window.location.reload();
+			}).catch( async res => {
+				console.log( await res.text());
+			})
+		}
+		
+		
+		
+		window.onload = function(){
+			fetch('http://localhost:8080/file', {
+				method: 'GET'
+			}).then( async res => {
+				var fileList = await res.json();
+				var ul = document.querySelector('#file_list');
+				
+				var fileListHtmlList = fileList.map( f => {
+					var html = `<li data-id="${f.id}">
+									<div>
+										<span>${f.originalName}</span>
+										<span style="cursor:pointer;color:red;" onclick="deleteFile(event)">삭제</span>
+									</div>
+									<div>
+										<input type="file" name="edit">
+										<button type="button" onclick="editFile(event)">수정</button>
+									</div>
+									<image src="${f.fileUrl}"
+										   style="width:100px;">
+									</image>
+								</li>`;
+					return html;
+				})
+				
+				ul.innerHTML = fileListHtmlList.join('');
+			}).catch( async res => {
+				console.log( await res.text());
+			})
+		}
+		
+		
+		function deleteFile(e){
+			var li = e.target.closest('li');
+			var fileId = li.dataset['id'];
+			
+			fetch('http://localhost:8080/file?fileId=' + fileId, {
+				method: 'DELETE',
+			}).then( async res => {
+				window.location.reload();
+			}).catch( async res => {
+				console.log( await res.text());
+			})
+		}
+		
+		
+		function editFile(e){
+			var li = e.target.closest('li');
+			var fileId = li.dataset['id'];
+			
+			var file = e.target.parentElement.querySelector("input[name=edit]");
+			var files = file.files[0];
+			var formData = new FormData();
+			formData.set('file', files);
+			formData.set('fileId', fileId);
+			
+			fetch('http://localhost:8080/file', {
+				method: 'PUT',
+				body: formData
+			}).then( async res => {
+				console.log( await res.text());
+			}).catch( async res => {
+				console.log( await res.text());
+			})
+		}
+	</script>	
+</body>
+</html>
